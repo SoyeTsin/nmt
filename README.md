@@ -1,191 +1,191 @@
-# Neural Machine Translation (seq2seq) Tutorial
+＃Neural Machine Translation（seq2seq）教程
 
-*Authors: Thang Luong, Eugene Brevdo, Rui Zhao ([Google Research Blogpost](https://research.googleblog.com/2017/07/building-your-own-neural-machine.html), [Github](https://github.com/tensorflow/nmt))*
+*作者：Thang Luong，Eugene Brevdo，Rui Zhao（[Google Research Blogpost]（https://research.googleblog.com/2017/07/building-your-own-neural-machine.html），[Github]（https ：//github.com/tensorflow/nmt））*
 
-*This version of the tutorial requires [TensorFlow Nightly](https://github.com/tensorflow/tensorflow/#installation).
-For using the stable TensorFlow versions, please consider other branches such as
-[tf-1.4](https://github.com/tensorflow/nmt/tree/tf-1.4).*
+*此版本的教程需要[TensorFlow Nightly]（https://github.com/tensorflow/tensorflow/#installation）。
+要使用稳定的TensorFlow版本，请考虑其他分支，例如
+[TF-1.4]（https://github.com/tensorflow/nmt/tree/tf-1.4）。*
 
-*If make use of this codebase for your research, please cite
-[this](#bibtex).*
+*如果您的研究使用此代码库，请引用
+[此]（＃中文提供）。*
 
-- [Introduction](#introduction)
-- [Basic](#basic)
-   - [Background on Neural Machine Translation](#background-on-neural-machine-translation)
-   - [Installing the Tutorial](#installing-the-tutorial)
-   - [Training – *How to build our first NMT system*](#training--how-to-build-our-first-nmt-system)
-      - [Embedding](#embedding)
-      - [Encoder](#encoder)
-      - [Decoder](#decoder)
-      - [Loss](#loss)
-      - [Gradient computation & optimization](#gradient-computation--optimization)
-   - [Hands-on – *Let's train an NMT model*](#hands-on--lets-train-an-nmt-model)
-   - [Inference – *How to generate translations*](#inference--how-to-generate-translations)
-- [Intermediate](#intermediate)
-   - [Background on the Attention Mechanism](#background-on-the-attention-mechanism)
-   - [Attention Wrapper API](#attention-wrapper-api)
-   - [Hands-on – *Building an attention-based NMT model*](#hands-on--building-an-attention-based-nmt-model)
-- [Tips & Tricks](#tips--tricks)
-   - [Building Training, Eval, and Inference Graphs](#building-training-eval-and-inference-graphs)
-   - [Data Input Pipeline](#data-input-pipeline)
-   - [Other details for better NMT models](#other-details-for-better-nmt-models)
-      - [Bidirectional RNNs](#bidirectional-rnns)
-      - [Beam search](#beam-search)
-      - [Hyperparameters](#hyperparameters)
-      - [Multi-GPU training](#multi-gpu-training)
-- [Benchmarks](#benchmarks)
-   - [IWSLT English-Vietnamese](#iwslt-english-vietnamese)
-   - [WMT German-English](#wmt-german-english)
-   - [WMT English-German &mdash; *Full Comparison*](#wmt-english-german--full-comparison)
-   - [Standard HParams](#standard-hparams)
-- [Other resources](#other-resources)
-- [Acknowledgment](#acknowledgment)
-- [References](#references)
-- [BibTex](#bibtex)
+ -  [简介]（＃介绍）
+ -  [基础]（#basic）
+    -  [神经机器翻译背景]（＃background-on-neural-machine-translation）
+    -  [安装教程]（＃Installing-the-tutorial）
+    -  [培训 -  *如何构建我们的第一个NMT系统*]（＃training  -  how-to-build-our-first-nmt-system）
+       -  [嵌入]（＃嵌入）
+       -  [编码器]（＃encoder）
+       -  [解码器]（＃decoder）
+       -  [损失]（＃loss）
+       -  [梯度计算和优化]（＃梯度计算 - 优化）
+    -  [动手 -  *让我们训练一个NMT模型*]（＃动手 - 让我们训练一个纳米模型）
+    -  [推论 -  *如何生成翻译*]（＃推理 - 如何生成翻译）
+ -  [中级]（＃intermediate）
+    -  [关注机制的背景]（#back-on-the-attention-mechanism）
+    -  [注意包装API]（＃attention-wrapper-api）
+    -  [实践 -  *建立基于注意力的NMT模型*]（＃动手 - 构建基于注意力的-nmt模型）
+ -  [提示与技巧]（＃tips  -  tricks）
+    -  [构建训练，评估和推理图]（＃building-training-eval-and-inference-graphs）
+    -  [数据输入管道]（#data-input-pipeline）
+    -  [更好的NMT模型的其他细节]（＃other-details-for-better-nmt-models）
+       -  [双向RNN]（＃bidirectional-rnns）
+       -  [光束搜索]（＃beam-search）
+       -  [超参数]（#hyperparameters）
+       -  [多GPU培训]（＃multi-gpu-training）
+ -  [基准]（＃基准）
+    -  [IWSLT英语 - 越南语]（＃iwslt-english-vietnamese）
+    -  [WMT德语 - 英语]（＃wmt-german-english）
+    -  [WMT英语 - 德语＆mdash; *完整比较*]（＃wmt-english-german  - 完整比较）
+    -  [标准HParams]（＃standard-hparams）
+ -  [其他资源]（＃other-resources）
+ -  [确认]（＃确认）
+ -  [参考文献]（＃参考）
+ -  [BibTex]（＃bibtex）
 
 
-# Introduction
+＃ 介绍
 
-Sequence-to-sequence (seq2seq) models
-([Sutskever et al., 2014](https://papers.nips.cc/paper/5346-sequence-to-sequence-learning-with-neural-networks.pdf),
-[Cho et al., 2014](http://emnlp2014.org/papers/pdf/EMNLP2014179.pdf)) have
-enjoyed great success in a variety of tasks such as machine translation, speech
-recognition, and text summarization. This tutorial gives readers a full
-understanding of seq2seq models and shows how to build a competitive seq2seq
-model from scratch. We focus on the task of Neural Machine Translation (NMT)
-which was the very first testbed for seq2seq models with
-wild
-[success](https://research.googleblog.com/2016/09/a-neural-network-for-machine.html). The
-included code is lightweight, high-quality, production-ready, and incorporated
-with the latest research ideas. We achieve this goal by:
+序列到序列（seq2seq）模型
+（[Sutskever et al。，2014]（https://papers.nips.cc/paper/5346-sequence-to-sequence-learning-with-neural-networks.pdf），
+[Cho et al。，2014]（http://emnlp2014.org/papers/pdf/EMNLP2014179.pdf））
+在机器翻译，演讲等各种任务中取得了巨大成功
+识别和文本摘要。本教程为读者提供了完整的
+了解seq2seq模型并展示如何构建具有竞争力的seq2seq
+从头开始的模型。我们专注于神经机器翻译（NMT）的任务
+这是seq2seq模型的第一个测试平台
+野生
+[成功（https://research.googleblog.com/2016/09/a-neural-network-for-machine.html）。该
+包含的代码是轻量级，高质量，生产就绪，并入
+有了最新的研究思路。我们实现这一目标：
 
-1. Using the recent decoder / attention
-   wrapper
-   [API](https://github.com/tensorflow/tensorflow/tree/master/tensorflow/contrib/seq2seq/python/ops),
-   TensorFlow 1.2 data iterator
-1. Incorporating our strong expertise in building recurrent and seq2seq models
-1. Providing tips and tricks for building the very best NMT models and replicating
-   [Google’s NMT (GNMT) system](https://research.google.com/pubs/pub45610.html).
+1.使用最近的解码器/注意
+   包装纸
+   [API]（https://github.com/tensorflow/tensorflow/tree/master/tensorflow/contrib/seq2seq/python/ops），
+   TensorFlow 1.2数据迭代器
+1.结合我们在建立经常性和seq2seq模型方面的强大专业知识
+1.提供建立最佳NMT模型和复制的提示和技巧
+   [Google的NMT（GNMT）系统]（https://research.google.com/pubs/pub45610.html）。
 
-We believe that it is important to provide benchmarks that people can easily
-replicate. As a result, we have provided full experimental results and
-pretrained our models on the following publicly available datasets:
+我们认为，提供人们可以轻松获得的基准非常重要
+复制。因此，我们提供了完整的实验结果和
+在以下公开数据集上预先训练我们的模型：
 
-1. *Small-scale*: English-Vietnamese parallel corpus of TED talks (133K sentence
-   pairs) provided by
-   the
-   [IWSLT Evaluation Campaign](https://sites.google.com/site/iwsltevaluation2015/).
-1. *Large-scale*: German-English parallel corpus (4.5M sentence pairs) provided
-   by the [WMT Evaluation Campaign](http://www.statmt.org/wmt16/translation-task.html).
+1. *小规模*：英语 - 越南语平行语料库的TE​​D谈话（133K句
+   对）提供
+   该
+   [IWSLT评估活动]（https://sites.google.com/site/iwsltevaluation2015/）。
+1. *大规模*：提供德语 - 英语平行语料库（4.5M句子对）
+   通过[WMT评估活动]（http://www.statmt.org/wmt16/translation-task.html）。
 
-We first build up some basic knowledge about seq2seq models for NMT, explaining
-how to build and train a vanilla NMT model. The second part will go into details
-of building a competitive NMT model with attention mechanism. We then discuss
-tips and tricks to build the best possible NMT models (both in speed and
-translation quality) such as TensorFlow best practices (batching, bucketing),
-bidirectional RNNs, beam search, as well as scaling up to multiple GPUs using GNMT attention.
+我们首先建立一些关于NMT的seq2seq模型的基本知识，解释
+如何建立和培养香草NMT模型。第二部分将详细介绍
+利用关注机制构建具有竞争力的NMT模型。然后我们讨论
+建立最佳NMT模型的提示和技巧（包括速度和速度）
+翻译质量）如TensorFlow最佳实践（批处理，分组），
+双向RNN，波束搜索，以及使用GNMT注意扩展到多个GPU。
 
-# Basic
+＃基本
 
-## Background on Neural Machine Translation
+##神经机器翻译背景
 
-Back in the old days, traditional phrase-based translation systems performed
-their task by breaking up source sentences into multiple chunks and then
-translated them phrase-by-phrase. This led to disfluency in the translation
-outputs and was not quite like how we, humans, translate. We read the entire
-source sentence, understand its meaning, and then produce a translation. Neural
-Machine Translation (NMT) mimics that!
+回到过去，传统的基于短语的翻译系统已经完成
+他们的任务是将源句分成多个块然后
+逐个翻译他们。这导致了翻译的不流畅
+输出，并不像我们，人类，翻译。我们读了整个
+源句，理解其含义，然后产生翻译。神经
+机器翻译（NMT）模仿了！
 
-<p align="center">
-<img width="80%" src="nmt/g3doc/img/encdec.jpg" />
-<br>
-Figure 1. <b>Encoder-decoder architecture</b> – example of a general approach for
-NMT. An encoder converts a source sentence into a "meaning" vector which is
-passed through a <i>decoder</i> to produce a translation.
-</p>
+<p align =“center”>
+<img width =“80％”src =“nmt / g3doc / img / encdec.jpg”/>
+点击
+图1. <b>编码器 - 解码器架构</ b>  - 一般方法的示例
+NMT。编码器将源句子转换为“含义”向量
+通过<i>解码器</ i>来产生翻译。
+</ p>
 
-Specifically, an NMT system first reads the source sentence using an *encoder*
-to build
-a
-["thought" vector](https://www.theguardian.com/science/2015/may/21/google-a-step-closer-to-developing-machines-with-human-like-intelligence),
-a sequence of numbers that represents the sentence meaning; a *decoder*, then,
-processes the sentence vector to emit a translation, as illustrated in
-Figure 1. This is often referred to as the *encoder-decoder architecture*. In
-this manner, NMT addresses the local translation problem in the traditional
-phrase-based approach: it can capture *long-range dependencies* in languages,
-e.g., gender agreements; syntax structures; etc., and produce much more fluent
-translations as demonstrated
-by
-[Google Neural Machine Translation systems](https://research.googleblog.com/2016/09/a-neural-network-for-machine.html).
+具体来说，NMT系统首先使用*编码器*读取源句子
+建立
+一个
+[“思想”载体]（https://www.theguardian.com/science/2015/may/21/google-a-step-closer-to-developing-machines-with-human-like-intelligence），
+表示句子含义的一系列数字; a *解码器*，然后，
+处理句子向量以发出翻译，如图所示
+图1.这通常被称为*编码器 - 解码器架构*。在
+这种方式，NMT解决了传统的本地翻译问题
+基于短语的方法：它可以捕获语言中的*远程依赖*
+例如，性别协议;语法结构;等，并产生更流畅
+翻译如所示
+通过
+[Google Neural Machine Translation systems]（https://research.googleblog.com/2016/09/a-neural-network-for-machine.html）。
 
-NMT models vary in terms of their exact architectures. A natural choice for
-sequential data is the recurrent neural network (RNN), used by most NMT models.
-Usually an RNN is used for both the encoder and decoder. The RNN models,
-however, differ in terms of: (a) *directionality* – unidirectional or
-bidirectional; (b) *depth* – single- or multi-layer; and (c) *type* – often
-either a vanilla RNN, a Long Short-term Memory (LSTM), or a gated recurrent unit
-(GRU). Interested readers can find more information about RNNs and LSTM on
-this [blog post](http://colah.github.io/posts/2015-08-Understanding-LSTMs/).
+NMT模型的确切架构各不相同。自然的选择
+顺序数据是大多数NMT模型使用的递归神经网络（RNN）。
+通常RNN用于编码器和解码器。 RNN模型，
+但是，在以下方面有所不同：（a）*方向性*  - 单向或
+双向的; （b）*深度*  - 单层或多层; （c）*类型*  - 经常
+无论是香草RNN，长期短期记忆（LSTM）还是门控复发单位
+（GRU）。有兴趣的读者可以找到有关RNN和LSTM的更多信息
+这篇[博客文章]（http://colah.github.io/posts/2015-08-Understanding-LSTMs/）。
 
-In this tutorial, we consider as examples a *deep multi-layer RNN* which is
-unidirectional and uses LSTM as a recurrent unit. We show an example of such a
-model in Figure 2. In this example, we build a model to translate a source
-sentence "I am a student" into a target sentence "Je suis étudiant". At a high
-level, the NMT model consists of two recurrent neural networks: the *encoder*
-RNN simply consumes the input source words without making any prediction; the
-*decoder*, on the other hand, processes the target sentence while predicting the
-next words.
+在本教程中，我们将*深层多层RNN *视为示例
+单向并使用LSTM作为循环单位。我们展示了这样一个例子
+在这个例子中，我们构建了一个转换源的模型
+句子“我是学生”成为目标句子“Jesuisétudiant”。在高处
+级别，NMT模型由两个递归神经网络组成：*编码器*
+RNN只是消耗输入源词而不进行任何预测;该
+另一方面，* decoder *在预测时处理目标句子
+接下来的话。
 
-For more information, we refer readers
-to [Luong (2016)](https://github.com/lmthang/thesis) which this tutorial is
-based on.
+有关更多信息，请参阅读者
+至[Luong（2016）]（https://github.com/lmthang/thesis）本教程是
+基于。
 
-<p align="center">
-<img width="48%" src="nmt/g3doc/img/seq2seq.jpg" />
-<br>
-Figure 2. <b>Neural machine translation</b> – example of a deep recurrent
-architecture proposed by for translating a source sentence "I am a student" into
-a target sentence "Je suis étudiant". Here, "&lts&gt" marks the start of the
-decoding process while "&lt/s&gt" tells the decoder to stop.
-</p>
+<p align =“center”>
+<img width =“48％”src =“nmt / g3doc / img / seq2seq.jpg”/>
+点击
+图2. <b>神经机器翻译</ b>  - 深度复发的例子
+建议用于翻译源句“我是学生”的建筑
+目标句子“Jesuisétudiant”。在这里，“＆lts＆gt”标志着它的开始
+解码过程，而“＆lt / s＆gt”告诉解码器停止。
+</ p>
 
-## Installing the Tutorial
+##安装教程
 
-To install this tutorial, you need to have TensorFlow installed on your system.
-This tutorial requires TensorFlow Nightly. To install TensorFlow, follow
-the [installation instructions here](https://www.tensorflow.org/install/).
+要安装本教程，您需要在系统上安装TensorFlow。
+本教程需要TensorFlow Nightly。要安装TensorFlow，请按照
+[安装说明]（https://www.tensorflow.org/install/）。
 
-Once TensorFlow is installed, you can download the source code of this tutorial
-by running:
+安装TensorFlow后，您可以下载本教程的源代码
+通过运行：
 
-``` shell
+```shell
 git clone https://github.com/tensorflow/nmt/
 ```
 
-## Training – How to build our first NMT system
+##培训 - 如何构建我们的第一个NMT系统
 
-Let's first dive into the heart of building an NMT model with concrete code
-snippets through which we will explain Figure 2 in more detail. We defer data
-preparation and the full code to later. This part refers to
-file
-[**model.py**](nmt/model.py).
+让我们首先深入探讨使用具体代码构建NMT模型的核心
+我们将通过这些片段更详细地解释图2。我们推迟数据
+准备和以后的完整代码。这部分是指
+文件
+[** model.py **]（NMT / model.py）。
 
-At the bottom layer, the encoder and decoder RNNs receive as input the
-following: first, the source sentence, then a boundary marker "\<s\>" which
-indicates the transition from the encoding to the decoding mode, and the target
-sentence.  For *training*, we will feed the system with the following tensors,
-which are in time-major format and contain word indices:
+在底层，编码器和解码器RNN接收作为输入
+以下：首先是源句，然后是边界标记“\ <s \>”
+表示从编码到解码模式的转换，以及目标
+句子。对于* training *，我们将使用以下张量为系统提供信息，
+它们是时间主要格式并包含单词索引：
 
--  **encoder_inputs** [max_encoder_time, batch_size]: source input words.
--  **decoder_inputs** [max_decoder_time, batch_size]: target input words.
--  **decoder_outputs** [max_decoder_time, batch_size]: target output words,
-   these are decoder_inputs shifted to the left by one time step with an
-   end-of-sentence tag appended on the right.
+ -  ** encoder_inputs ** [max_encoder_time，batch_size]：源输入字。
+ -  ** decoder_inputs ** [max_decoder_time，batch_size]：目标输入字。
+ -  ** decoder_outputs ** [max_decoder_time，batch_size]：目标输出字，
+   这些是使用一个时间步向左移动的decoder_inputs
+   右侧附有句末标记。
 
-Here for efficiency, we train with multiple sentences (batch_size) at
-once. Testing is slightly different, so we will discuss it later.
+为了提高效率，我们使用多个句子（batch_size）进行训练
+一旦。测试略有不同，我们稍后会讨论。
 
-### Embedding
+###嵌入
 
 Given the categorical nature of words, the model must first look up the source
 and target embeddings to retrieve the corresponding word representations. For
